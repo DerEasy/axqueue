@@ -11,7 +11,7 @@
 
 typedef unsigned long ulong;
 
-struct AXqueue {
+struct axqueue {
     void **items;   // base of array
     void **write;   // points to next cell to be written to
     void **read;    // points to current cell to be read from
@@ -31,9 +31,9 @@ static ulong toItemSize(ulong n) {
 }
     
 
-static AXqueue *sizedNew(ulong size) {
+static axqueue *sizedNew(ulong size) {
     size = MAX(1, size);
-    AXqueue *q = malloc(sizeof *q);
+    axqueue *q = malloc(sizeof *q);
     if (q) q->items = malloc(toItemSize(size));
 
     if (!q || !q->items) {
@@ -49,12 +49,12 @@ static AXqueue *sizedNew(ulong size) {
 }
 
 
-static AXqueue *new(void) {
+static axqueue *new(void) {
     return sizedNew(7);
 }
 
 
-static void destroy(AXqueue *q) {
+static void destroy(axqueue *q) {
     q->read -= q->cap * (q->read >= BOUND(q));
     if (q->destroy && q->len) do {
         q->destroy(*q->read++);
@@ -66,7 +66,7 @@ static void destroy(AXqueue *q) {
 }
 
 
-static bool grow(AXqueue *q) {
+static bool grow(axqueue *q) {
     ulong cap = q->cap * 2;
     void **items = realloc(q->items, toItemSize(cap));
     if (!items) return true;
@@ -87,7 +87,7 @@ static bool grow(AXqueue *q) {
 }
 
 
-static bool enqueue(AXqueue *q, void *val) {
+static bool enqueue(axqueue *q, void *val) {
     if (q->len >= q->cap) {
         if (grow(q)) return true;
     }
@@ -99,7 +99,7 @@ static bool enqueue(AXqueue *q, void *val) {
 }
 
 
-static void *dequeue(AXqueue *q) {
+static void *dequeue(axqueue *q) {
     void *val = q->len ? *q->read++ : NULL;
     q->read -= q->cap * (q->read >= BOUND(q));   // wrap-around
     q->len -= !!q->len;
@@ -107,12 +107,12 @@ static void *dequeue(AXqueue *q) {
 }
 
 
-static void *front(AXqueue *q) {
+static void *front(axqueue *q) {
     return q->len ? *q->read : NULL;
 }
 
 
-static union Long normaliseIndex(AXqueue *q, long index) {
+static union Long normaliseIndex(axqueue *q, long index) {
     union Long i = {.s = index};
 
     i.u += (i.s < 0) * q->len;    // convert negative to positive index
@@ -127,13 +127,13 @@ static union Long normaliseIndex(AXqueue *q, long index) {
 }
 
 
-static void *at(AXqueue *q, long index) {
+static void *at(axqueue *q, long index) {
     ulong i = normaliseIndex(q, index).u;
     return i < q->cap ? q->items[i] : NULL;
 }
 
 
-static bool swap(AXqueue *q, long index1, long index2) {
+static bool swap(axqueue *q, long index1, long index2) {
     ulong i1 = normaliseIndex(q, index1).u;
     ulong i2 = normaliseIndex(q, index2).u;
     if (i1 >= q->cap || i2 >= q->cap)
@@ -146,7 +146,7 @@ static bool swap(AXqueue *q, long index1, long index2) {
 }
 
 
-static AXqueue *reverse(AXqueue *q) {
+static axqueue *reverse(axqueue *q) {
     void **l = q->read;
     void **r = q->write - 1;
     r += q->cap * (r < q->items);
@@ -165,7 +165,7 @@ static AXqueue *reverse(AXqueue *q) {
 }
 
 
-static AXqueue *clear(AXqueue *q) {
+static axqueue *clear(axqueue *q) {
     q->read -= q->cap * (q->read >= BOUND(q));
     if (q->destroy && q->len) do {
         q->destroy(*q->read++);
@@ -178,8 +178,8 @@ static AXqueue *clear(AXqueue *q) {
 }
 
 
-static AXqueue *copy(AXqueue *q) {
-    AXqueue *q2 = sizedNew(q->cap);
+static axqueue *copy(axqueue *q) {
+    axqueue *q2 = sizedNew(q->cap);
     if (!q2) return NULL;
 
     if (q->read < q->write || q->len == 0) {
@@ -208,7 +208,7 @@ static void reverseSection(void **s, void **e) {    // do not expose
 }
 
 
-static void rotate(AXqueue *q, ulong n) {       // do not expose
+static void rotate(axqueue *q, ulong n) {       // do not expose
     if (n == 0) return;
     reverseSection(q->items, BOUND(q) - 1);
     reverseSection(q->items, q->items + n - 1);
@@ -216,7 +216,7 @@ static void rotate(AXqueue *q, ulong n) {       // do not expose
 }
 
 
-static bool resize(AXqueue *q, ulong size) {
+static bool resize(axqueue *q, ulong size) {
     size = MAX(1, size);
 
     if (size == q->cap) {
@@ -267,45 +267,49 @@ static bool resize(AXqueue *q, ulong size) {
 }
 
 
-static AXqueue *destroyItem(AXqueue *q, void *val) {
+static axqueue *destroyItem(axqueue *q, void *val) {
     if (q->destroy) q->destroy(val);
     return q;
 }
 
 
-static AXqueue *setDestructor(AXqueue *q, void (*destroy)(void *)) {
+static axqueue *setDestructor(axqueue *q, void (*destroy)(void *)) {
     q->destroy = destroy;
     return q;
 }
 
 
-static void (*getDestructor(AXqueue *q))(void *) {
+static void (*getDestructor(axqueue *q))(void *) {
     return q->destroy;
 }
 
 
-static void **data(AXqueue *q) {
+static void **data(axqueue *q) {
     if (q->write <= q->read && q->len)
         rotate(q, q->cap - (q->read - q->items));
     return q->read;
 }
 
 
-static long len(AXqueue *q) {
+static long len(axqueue *q) {
     union Long len = {q->len};
     len.u = len.u << 1 >> 1;    // get rid of sign bit
     return len.s;
 }
 
 
-static long cap(AXqueue *q) {
+static long cap(axqueue *q) {
     union Long cap = {q->cap};
     cap.u = cap.u << 1 >> 1;    // get rid of sign bit
     return cap.s;
 }
 
 
-const AXqueueFuncs axq = {
+#ifdef AXQUEUE_NAMESPACE
+#define axq AXQUEUE_NAMESPACE
+#endif
+
+const struct axqueueFn axq = {
         new,
         sizedNew,
         destroy,
@@ -325,3 +329,5 @@ const AXqueueFuncs axq = {
         data,
         cap
 };
+
+#undef axq
