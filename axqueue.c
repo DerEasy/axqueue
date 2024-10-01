@@ -9,6 +9,7 @@
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define BETWEEN(x, y, z) (MIN(MAX((x), (y)), (z)))
+#define ifwhile(p, q) if (p) while (q)
 
 static void *(*malloc_)(size_t size) = malloc;
 static void *(*realloc_)(void *ptr, size_t size) = realloc;
@@ -81,6 +82,10 @@ axqueue *axq_rotate(axqueue *q, int64_t shift) {
         return q;
     if (shift < 0)
         shift = q->cap + shift;
+    q->front += shift;
+    q->back += shift;
+    q->front -= (q->front >= q->cap) * q->cap;
+    q->back -= (q->back >= q->cap) * q->cap;
     reverseSection(q, 0, q->cap);
     reverseSection(q, 0, shift);
     reverseSection(q, shift, q->cap);
@@ -120,8 +125,6 @@ bool axq_resize(axqueue *q, uint64_t size) {
         }
         axq_rotate(q, -q->front);
         q->len -= discard;
-        q->front = 0;
-        q->back = q->len ? q->len - 1 : 0;
         void **items = realloc_(q->items, toItemSize(size));
         if (!items)
             return true;
