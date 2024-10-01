@@ -138,7 +138,7 @@ bool axq_add(axqueue *q, void *value) {
     if (q->len >= q->cap && axq_resize(q, (q->cap << 1) | 1))
         return true;
     if (q->len == q->cap) {
-        q->front = ++q->back, q->back *= q->back < q->cap;
+        q->front = (++q->back, q->back *= q->back < q->cap);
         if (q->destroy)
             q->destroy(q->items[q->back]);
     } else {
