@@ -8,7 +8,25 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// simple and fast array-based queue implementation
+// simple and fast array-based queue (ring buffer) implementation
 typedef struct axqueue axqueue;
+
+uint64_t axq_ulen(axqueue *q);
+
+int64_t axq_len(axqueue *q);
+
+axqueue *axq_newSized(uint64_t size, uint64_t maxSize);
+
+axqueue *axq_new(void);
+
+void axq_destroy(axqueue *q);
+
+axqueue *axq_rotate(axqueue *q, int64_t shift);
+
+bool axq_resize(axqueue *q, uint64_t size);
+
+bool axq_add(axqueue *q, void *value);
+
+void *axq_pop(axqueue *q);
 
 #endif //AXQUEUE_AXQUEUE_H
