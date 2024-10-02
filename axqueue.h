@@ -15,7 +15,15 @@ uint64_t axq_ulen(axqueue *q);
 
 int64_t axq_len(axqueue *q);
 
-axqueue *axq_newSized(uint64_t size, uint64_t maxSize);
+uint64_t axq_cap(axqueue *q);
+
+uint64_t axq_limit(axqueue *q);
+
+void (*axq_getDestructor(axqueue *q))(void *);
+
+axqueue *axq_setDestructor(axqueue *q, void (*destroy)(void *));
+
+axqueue *axq_newSized(uint64_t size, uint64_t limit);
 
 axqueue *axq_new(void);
 

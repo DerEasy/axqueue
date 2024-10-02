@@ -9,7 +9,6 @@
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define BETWEEN(x, y, z) (MIN(MAX((x), (y)), (z)))
-#define ifwhile(p, q) if (p) while (q)
 
 static void *(*malloc_)(size_t size) = malloc;
 static void *(*realloc_)(void *ptr, size_t size) = realloc;
@@ -21,7 +20,7 @@ struct axqueue {
     uint64_t back;   /* always points to where last value has been written */
     uint64_t len;
     uint64_t cap;
-    uint64_t maxcap;
+    uint64_t limit;
     void (*destroy)(void *);
 };
 
@@ -37,7 +36,24 @@ int64_t axq_len(axqueue *q) {
     return q->len;
 }
 
-axqueue *axq_newSized(uint64_t size, uint64_t maxSize) {
+uint64_t axq_cap(axqueue *q) {
+    return q->cap;
+}
+
+uint64_t axq_limit(axqueue *q) {
+    return q->limit;
+}
+
+void (*axq_getDestructor(axqueue *q))(void *) {
+    return q->destroy;
+}
+
+axqueue *axq_setDestructor(axqueue *q, void (*destroy)(void *)) {
+    q->destroy = destroy;
+    return q;
+}
+
+axqueue *axq_newSized(uint64_t size, uint64_t limit) {
     size = MAX(1, size);
     axqueue *q = malloc_(sizeof *q);
     if (q)
@@ -50,7 +66,7 @@ axqueue *axq_newSized(uint64_t size, uint64_t maxSize) {
     q->back = 0;
     q->len = 0;
     q->cap = size;
-    q->maxcap = maxSize;
+    q->limit = limit;
     q->destroy = NULL;
     return q;
 }
@@ -93,7 +109,7 @@ axqueue *axq_rotate(axqueue *q, int64_t shift) {
 }
 
 bool axq_resize(axqueue *q, uint64_t size) {
-    size = BETWEEN(1, size, q->maxcap);
+    size = BETWEEN(1, size, q->limit);
     if (size > q->cap) {
         void **items = realloc_(q->items, toItemSize(size));
         if (!items)
@@ -160,4 +176,13 @@ void *axq_pop(axqueue *q) {
             q->back = q->front = 0;
     }
     return value;
+}
+
+axqueue *axq_clear(axqueue *q) {
+    if (q->destroy) while (q->len--) {
+        q->destroy(q->items[q->front++]);
+        q->front *= q->front < q->cap;
+    }
+    q->front = q->back = q->len = 0;
+    return q;
 }
