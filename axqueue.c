@@ -22,10 +22,17 @@ struct axqueue {
     uint64_t cap;
     uint64_t limit;
     void (*destroy)(void *);
+    void *context;
 };
 
 static uint64_t toItemSize(uint64_t n) {
     return n * sizeof(void *);
+}
+
+void axq_memoryfn(void *(*malloc_fn)(size_t), void *(*realloc_fn)(void *, size_t), void (*free_fn)(void *)) {
+    malloc_ = malloc_fn ? malloc_fn : malloc;
+    realloc_ = realloc_fn ? realloc_fn : realloc;
+    free_ = free_fn ? free_fn : free;
 }
 
 uint64_t axq_ulen(axqueue *q) {
@@ -40,8 +47,12 @@ uint64_t axq_cap(axqueue *q) {
     return q->cap;
 }
 
-uint64_t axq_limit(axqueue *q) {
+uint64_t axq_getLimit(axqueue *q) {
     return q->limit;
+}
+
+bool axq_setLimit(axqueue *q, uint64_t limit) {
+    return (q->limit = limit) < q->cap && axq_resize(q, limit);
 }
 
 void (*axq_getDestructor(axqueue *q))(void *) {
@@ -53,12 +64,21 @@ axqueue *axq_setDestructor(axqueue *q, void (*destroy)(void *)) {
     return q;
 }
 
+void *axq_getContext(axqueue *q) {
+    return q->context;
+}
+
+axqueue *axq_setContext(axqueue *q, void *context) {
+    q->context = context;
+    return q;
+}
+
 bool axq_isFull(axqueue *q) {
     return q->len == q->limit;
 }
 
 axqueue *axq_newSized(uint64_t size, uint64_t limit) {
-    size = MAX(1, size);
+    size = BETWEEN(1, size, limit);
     axqueue *q = malloc_(sizeof *q);
     if (q)
         q->items = malloc_(toItemSize(size));
@@ -72,6 +92,7 @@ axqueue *axq_newSized(uint64_t size, uint64_t limit) {
     q->cap = size;
     q->limit = limit;
     q->destroy = NULL;
+    q->context = NULL;
     return q;
 }
 
@@ -205,6 +226,8 @@ axqueue *axq_rforeach(axqueue *q, bool (*f)(void *, void *), void *args) {
 }
 
 axqueue *axq_discard(axqueue *q, uint64_t n) {
+    if (n == 0)
+        return q;
     n = MIN(n, q->len);
     if (q->destroy) while (n--) {
         q->destroy(q->items[q->front++]);
