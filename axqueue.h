@@ -37,6 +37,14 @@ bool axq_add(axqueue *q, void *value);
 
 void *axq_pop(axqueue *q);
 
+void *axq_peek(axqueue *q);
+
+axqueue *axq_foreach(axqueue *q, bool (*f)(void *, void *), void *args);
+
+axqueue *axq_rforeach(axqueue *q, bool (*f)(void *, void *), void *args);
+
+axqueue *axq_discard(axqueue *q, uint64_t n);
+
 axqueue *axq_clear(axqueue *q);
 
 axqueue *axq_copy(axqueue *q);

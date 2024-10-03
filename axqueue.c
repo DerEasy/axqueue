@@ -186,6 +186,24 @@ void *axq_peek(axqueue *q) {
     return q->len ? q->items[q->front] : NULL;
 }
 
+axqueue *axq_foreach(axqueue *q, bool (*f)(void *, void *), void *args) {
+    uint64_t i = q->front;
+    uint64_t n = q->len;
+    while (n-- && f(q->items[i++], args))
+        i *= i < q->cap;
+    return q;
+}
+
+axqueue *axq_rforeach(axqueue *q, bool (*f)(void *, void *), void *args) {
+    uint64_t i = q->back;
+    uint64_t n = q->len;
+    while (n-- && f(q->items[i--], args)) {
+        if (i >= q->cap)
+            i = q->cap - 1;
+    }
+    return q;
+}
+
 axqueue *axq_discard(axqueue *q, uint64_t n) {
     n = MIN(n, q->len);
     if (q->destroy) while (n--) {
