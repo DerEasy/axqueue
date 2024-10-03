@@ -23,18 +23,22 @@ void (*axq_getDestructor(axqueue *q))(void *);
 
 axqueue *axq_setDestructor(axqueue *q, void (*destroy)(void *));
 
+bool axq_isFull(axqueue *q);
+
 axqueue *axq_newSized(uint64_t size, uint64_t limit);
 
 axqueue *axq_new(void);
 
 void axq_destroy(axqueue *q);
 
-axqueue *axq_rotate(axqueue *q, int64_t shift);
-
 bool axq_resize(axqueue *q, uint64_t size);
 
 bool axq_add(axqueue *q, void *value);
 
 void *axq_pop(axqueue *q);
+
+axqueue *axq_clear(axqueue *q);
+
+axqueue *axq_copy(axqueue *q);
 
 #endif //AXQUEUE_AXQUEUE_H

@@ -53,6 +53,10 @@ axqueue *axq_setDestructor(axqueue *q, void (*destroy)(void *)) {
     return q;
 }
 
+bool axq_isFull(axqueue *q) {
+    return q->len == q->limit;
+}
+
 axqueue *axq_newSized(uint64_t size, uint64_t limit) {
     size = MAX(1, size);
     axqueue *q = malloc_(sizeof *q);
@@ -92,9 +96,8 @@ static void reverseSection(axqueue *q, uint64_t start, uint64_t end) {
     }
 }
 
-axqueue *axq_rotate(axqueue *q, int64_t shift) {
-    shift %= (int64_t) q->len;
-    if (shift == 0)
+static axqueue *preservativeRotation(axqueue *q, int64_t shift) {
+    if (q->len == 0 || (shift %= (int64_t) q->len) == 0)
         return q;
     if (shift < 0)
         shift = q->cap + shift;
@@ -139,7 +142,7 @@ bool axq_resize(axqueue *q, uint64_t size) {
             q->front += discard;
             q->front -= (q->front >= q->cap) * q->cap;
         }
-        axq_rotate(q, -q->front);
+        preservativeRotation(q, -q->front);
         q->len -= discard;
         void **items = realloc_(q->items, toItemSize(size));
         if (!items)
@@ -154,15 +157,16 @@ bool axq_add(axqueue *q, void *value) {
     if (q->len >= q->cap && axq_resize(q, (q->cap << 1) | 1))
         return true;
     if (q->len == q->cap) {
-        q->front = (++q->back, q->back *= q->back < q->cap);
         if (q->destroy)
-            q->destroy(q->items[q->back]);
+            q->destroy(q->items[q->front]);
+        ++q->front, q->front *= q->front < q->cap;
+        ++q->back, q->back *= q->back < q->cap;
     } else {
         q->back += !!q->len;
         q->back *= q->back < q->cap;
+        ++q->len;
     }
     q->items[q->back] = value;
-    ++q->len;
     return false;
 }
 
@@ -173,9 +177,30 @@ void *axq_pop(axqueue *q) {
         if (--q->len)
             q->front *= q->front < q->cap;
         else
-            q->back = q->front = 0;
+            q->front = q->back = 0;
     }
     return value;
+}
+
+void *axq_peek(axqueue *q) {
+    return q->len ? q->items[q->front] : NULL;
+}
+
+axqueue *axq_discard(axqueue *q, uint64_t n) {
+    n = MIN(n, q->len);
+    if (q->destroy) while (n--) {
+        q->destroy(q->items[q->front++]);
+        q->front *= q->front < q->cap;
+    } else {
+        uint64_t firstPortion = MIN(q->cap - q->front, n);
+        uint64_t secondPortion = n - firstPortion;
+        q->front += firstPortion;
+        q->front *= q->front < q->cap;
+        q->front += secondPortion;
+    }
+    if (q->len == 0)
+        q->front = q->back = 0;
+    return q;
 }
 
 axqueue *axq_clear(axqueue *q) {
@@ -185,4 +210,21 @@ axqueue *axq_clear(axqueue *q) {
     }
     q->front = q->back = q->len = 0;
     return q;
+}
+
+axqueue *axq_copy(axqueue *q) {
+    axqueue *q2 = axq_newSized(q->cap, q->limit);
+    if (!q2)
+        return NULL;
+    if (q->front <= q->back) {
+        memcpy(q2->items, &q->items[q->front], toItemSize(q->len));
+    } else {
+        uint64_t frontToEnd = q->cap - q->front;
+        uint64_t startToBack = q->back + 1;
+        memcpy(q2->items, &q->items[q->front], toItemSize(frontToEnd));
+        memcpy(&q2->items[frontToEnd], q->items, toItemSize(startToBack));
+    }
+    q2->len = q->len;
+    q2->back = q->len - !!q->len;
+    return q2;
 }
