@@ -100,13 +100,15 @@ axqueue *axq_new(void) {
     return axq_newSized(7, UINT64_MAX);
 }
 
-void axq_destroy(axqueue *q) {
+void *axq_destroy(axqueue *q) {
     if (q->destroy) while (q->len--) {
         q->destroy(q->items[q->front++]);
         q->front *= q->front < q->cap;
     }
+    void *context = q->context;
     free_(q->items);
     free_(q);
+    return context;
 }
 
 static void reverseSection(axqueue *q, uint64_t start, uint64_t end) {

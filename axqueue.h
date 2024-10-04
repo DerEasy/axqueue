@@ -104,8 +104,9 @@ axqueue *axq_new(void);
 /**
  * Call the destructor on all items starting from the head if it is set; regardless, all memory is released and the
  * queue is invalidated thereafter.
+ * @return Context.
  */
-void axq_destroy(axqueue *q);
+void *axq_destroy(axqueue *q);
 
 /**
  * Resize the queue's capacity. If the new capacity subceeds the current length of the queue, items starting from the
